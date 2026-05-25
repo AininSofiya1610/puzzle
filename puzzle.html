@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Ocean Puzzle Game — Kedah Medical Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Nunito',sans-serif;background:linear-gradient(135deg,#E0F7FA,#B2EBF2);min-height:100vh;padding:16px}
+.app{max-width:740px;margin:0 auto;background:#fff;border-radius:20px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,0.10)}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.title{font-size:22px;font-weight:800;color:#0f172a}
+.title span{color:#1D9E75}
+.kmc{font-size:12px;font-weight:700;color:#0F6E56;background:#E1F5EE;padding:3px 12px;border-radius:20px;display:inline-block;margin-bottom:6px}
+.controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ctrl-label{font-size:13px;color:#666;font-weight:700}
+.size-btn,.hint-btn{border:1.5px solid #ccc;border-radius:8px;padding:5px 13px;font-size:13px;font-weight:800;cursor:pointer;background:#fff;color:#333;font-family:'Nunito',sans-serif;transition:background 0.12s}
+.size-btn:hover,.hint-btn:hover{background:#f0f0f0}
+.size-btn.active{background:#1D9E75;color:#fff;border-color:#1D9E75}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.stat{background:#f7f8fa;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;color:#666}
+.stat span{color:#0f172a;font-weight:800}
+.puzzle-nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.puzzle-nav-btn{border:1.5px solid #ddd;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:800;cursor:pointer;background:#fff;color:#333;font-family:'Nunito',sans-serif;transition:all 0.12s}
+.puzzle-nav-btn:hover{border-color:#1D9E75;color:#1D9E75}
+.puzzle-nav-btn.active{background:#1D9E75;color:#fff;border-color:#1D9E75}
+.puzzle-wrap{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.piece-pool-col{width:180px;flex-shrink:0}
+.board-col{flex:1;min-width:260px}
+.board-label{font-size:12px;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px}
+.board{display:grid;border:2px solid #ddd;border-radius:12px;overflow:hidden;background:#f0f0f0}
+.cell{border:1px solid #e0e0e0;display:flex;align-items:center;justify-content:center;transition:background 0.15s}
+.cell.drag-over{background:#E1F5EE;border-color:#1D9E75}
+.cell.correct{outline:3px solid #1D9E75;outline-offset:-3px}
+/* PIECE POOL — 2-column grid of square pieces */
+.piece-pool{display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:500px;overflow-y:auto;padding:2px}
+.piece{cursor:grab;border-radius:6px;overflow:hidden;border:2px solid #ddd;transition:transform 0.15s,border-color 0.15s;user-select:none;aspect-ratio:1/1}
+.piece:hover{transform:scale(1.05);border-color:#1D9E75}
+.piece:active{cursor:grabbing}
+.piece.dragging{opacity:0.35}
+.piece.used{opacity:0.15;pointer-events:none}
+.piece canvas{display:block;width:100%;height:100%;object-fit:cover}
+.preview-wrap{margin-bottom:12px}
+.preview-label{font-size:12px;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+.preview-img{width:100%;border-radius:8px;border:1.5px solid #ddd;display:block;aspect-ratio:1/1}
+.complete-banner{display:none;background:#E1F5EE;border:2px solid #1D9E75;border-radius:12px;padding:16px 20px;text-align:center;margin-top:14px}
+.complete-banner.show{display:block}
+.complete-banner h3{font-size:20px;font-weight:800;color:#085041;margin-bottom:6px}
+.complete-banner p{font-size:14px;color:#0F6E56;margin-bottom:12px}
+.new-btn{background:#1D9E75;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:15px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif}
+.new-btn:hover{background:#178f68}
+.footer{text-align:center;margin-top:16px;font-size:12px;color:#aaa}
+</style>
+</head>
+<body>
+<div class="app">
+  <div style="text-align:center;margin-bottom:4px"><span class="kmc">Kedah Medical Center</span></div>
+  <div class="topbar">
+    <div class="title">Ocean <span>Puzzle</span> 🌊</div>
+    <div class="controls">
+      <span class="ctrl-label">Pieces:</span>
+      <button class="size-btn" onclick="initGame(2)">4</button>
+      <button class="size-btn active" onclick="initGame(3)">9</button>
+      <button class="size-btn" onclick="initGame(4)">16</button>
+      <button class="size-btn" onclick="initGame(5)">25</button>
+      <button class="hint-btn" onclick="showHint()">💡 Hint (+3)</button>
+      <button class="hint-btn" id="mute-btn" onclick="toggleMute()" title="Toggle music">🔊 Music</button>
+    </div>
+  </div>
+  <div class="puzzle-nav" id="puzzle-nav"></div>
+  <div class="stats">
+    <div class="stat">Moves: <span id="moves">0</span></div>
+    <div class="stat">Time: <span id="timer">0:00</span></div>
+    <div class="stat">Puzzle: <span id="puzzle-name">Clownfish</span></div>
+  </div>
+  <div class="puzzle-wrap">
+    <div class="piece-pool-col">
+      <div class="preview-wrap">
+        <div class="preview-label">Target Image</div>
+        <canvas id="preview-canvas" class="preview-img"></canvas>
+      </div>
+      <div class="board-label">Pieces</div>
+      <div class="piece-pool" id="piece-pool" ondragover="event.preventDefault()" ondrop="onDropToPool(event)"></div>
+    </div>
+    <div class="board-col">
+      <div class="board-label">Puzzle Board — drag pieces here</div>
+      <div class="board" id="board"></div>
+    </div>
+  </div>
+  <div class="complete-banner" id="complete-banner">
+    <h3 id="complete-title">Puzzle Complete! 🎉</h3>
+    <p id="complete-msg"></p>
+    <button class="new-btn" onclick="nextPuzzle()">Next Puzzle ➜</button>
+  </div>
+  <div class="footer">© Kedah Medical Center — Ocean Puzzle Game</div>
+</div>
+
+<script>
+const PUZZLES=[
+  {name:'Clownfish 🐠',draw:drawClownfish},
+  {name:'Sea Turtle 🐢',draw:drawTurtle},
+  {name:'Jellyfish 🪼',draw:drawJellyfish},
+  {name:'Octopus 🐙',draw:drawOctopus},
+  {name:'Dolphin 🐬',draw:drawDolphin},
+];
+let grid=3,moves=0,seconds=0,timerInterval=null;
+let pieces=[],boardState=[],solved=false,currentPuzzle=0;
+const BS=420;
+
+function drawClownfish(ctx,w,h){
+  for(let i=0;i<8;i++){ctx.fillStyle=i%2===0?'#1E6BB8':'#124F8A';ctx.fillRect(0,i*(h/8),w,h/8);}
+  ctx.fillStyle='#FF6B00';ctx.beginPath();ctx.ellipse(w*.5,h*.5,w*.28,h*.2,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#FF8C00';ctx.beginPath();ctx.ellipse(w*.5,h*.5,w*.22,h*.15,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#fff';ctx.lineWidth=w*.04;
+  ctx.beginPath();ctx.moveTo(w*.35,h*.3);ctx.lineTo(w*.35,h*.7);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(w*.62,h*.3);ctx.lineTo(w*.62,h*.7);ctx.stroke();
+  ctx.fillStyle='#1a1a1a';ctx.beginPath();ctx.arc(w*.38,h*.45,w*.025,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(w*.385,h*.44,w*.01,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#FF4500';ctx.beginPath();ctx.moveTo(w*.72,h*.4);ctx.lineTo(w*.88,h*.3);ctx.lineTo(w*.88,h*.7);ctx.lineTo(w*.72,h*.6);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#FF6B00';
+  ctx.beginPath();ctx.moveTo(w*.5,h*.2);ctx.quadraticCurveTo(w*.4,h*.05,w*.3,h*.1);ctx.quadraticCurveTo(w*.45,h*.15,w*.5,h*.2);ctx.fill();
+  ctx.beginPath();ctx.moveTo(w*.5,h*.8);ctx.quadraticCurveTo(w*.4,h*.95,w*.3,h*.9);ctx.quadraticCurveTo(w*.45,h*.85,w*.5,h*.8);ctx.fill();
+}
+function drawTurtle(ctx,w,h){
+  for(let i=0;i<6;i++){ctx.fillStyle=i%2===0?'#0077B6':'#023E8A';ctx.fillRect(0,i*(h/6),w,h/6);}
+  ctx.fillStyle='#2D6A4F';ctx.beginPath();ctx.ellipse(w*.5,h*.5,w*.3,h*.25,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#1B4332';ctx.lineWidth=w*.015;
+  ctx.beginPath();ctx.moveTo(w*.35,h*.35);ctx.lineTo(w*.65,h*.65);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(w*.65,h*.35);ctx.lineTo(w*.35,h*.65);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(w*.5,h*.25);ctx.lineTo(w*.5,h*.75);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(w*.2,h*.5);ctx.lineTo(w*.8,h*.5);ctx.stroke();
+  ctx.fillStyle='#40916C';
+  [[.2,.35],[.2,.65],[.8,.35],[.8,.65]].forEach(([fx,fy])=>{ctx.beginPath();ctx.ellipse(w*fx,h*fy,w*.08,h*.05,fx<.5?-.5:.5,0,Math.PI*2);ctx.fill();});
+  ctx.fillStyle='#52B788';ctx.beginPath();ctx.ellipse(w*.5,h*.25,w*.07,h*.06,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#1a1a1a';
+  ctx.beginPath();ctx.arc(w*.47,h*.22,w*.015,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(w*.53,h*.22,w*.015,0,Math.PI*2);ctx.fill();
+}
+function drawJellyfish(ctx,w,h){
+  const g=ctx.createLinearGradient(0,0,0,h);g.addColorStop(0,'#0D1B2A');g.addColorStop(1,'#1B3A5C');
+  ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+  for(let i=0;i<20;i++){ctx.fillStyle=`rgba(255,255,255,${Math.random()*.4+.1})`;ctx.beginPath();ctx.arc(Math.random()*w,Math.random()*h,Math.random()*2+.5,0,Math.PI*2);ctx.fill();}
+  ctx.fillStyle='rgba(200,150,255,0.85)';ctx.beginPath();ctx.ellipse(w*.5,h*.35,w*.28,h*.22,0,Math.PI,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(220,180,255,0.6)';ctx.beginPath();ctx.ellipse(w*.5,h*.36,w*.2,h*.14,0,Math.PI,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='rgba(200,150,255,0.7)';ctx.lineWidth=w*.02;
+  [.3,.38,.45,.5,.55,.62,.7].forEach((tx,i)=>{ctx.beginPath();ctx.moveTo(w*tx,h*.35);ctx.quadraticCurveTo(w*(tx+(i%2===0?-.05:.05)),h*.6,w*(tx+(i%2===0?.03:-.03)),h*.8);ctx.stroke();});
+  ctx.fillStyle='rgba(255,200,255,0.5)';ctx.beginPath();ctx.ellipse(w*.5,h*.35,w*.12,h*.08,0,Math.PI,Math.PI*2);ctx.fill();
+}
+function drawOctopus(ctx,w,h){
+  ctx.fillStyle='#023E8A';ctx.fillRect(0,0,w,h);
+  ctx.fillStyle='#C04B8A';ctx.beginPath();ctx.ellipse(w*.5,h*.38,w*.25,h*.2,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#C04B8A';ctx.lineWidth=w*.06;ctx.lineCap='round';
+  [[.25,.55,.1,.85],[.35,.6,.18,.9],[.5,.58,.5,.92],[.65,.6,.82,.9],[.75,.55,.9,.85],[.2,.5,.05,.7],[.8,.5,.95,.7]].forEach(([x1,y1,x2,y2])=>{
+    ctx.beginPath();ctx.moveTo(w*x1,h*y1);ctx.quadraticCurveTo(w*((x1+x2)/2),h*((y1+y2)/2),w*x2,h*y2);ctx.stroke();
+  });
+  ctx.fillStyle='#E07AB0';ctx.beginPath();ctx.ellipse(w*.5,h*.36,w*.2,h*.16,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(w*.42,h*.33,w*.06,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(w*.58,h*.33,w*.06,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#1a1a1a';ctx.beginPath();ctx.arc(w*.43,h*.34,w*.03,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(w*.59,h*.34,w*.03,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(w*.44,h*.33,w*.01,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(w*.60,h*.33,w*.01,0,Math.PI*2);ctx.fill();
+}
+function drawDolphin(ctx,w,h){
+  const g=ctx.createLinearGradient(0,0,0,h);g.addColorStop(0,'#48CAE4');g.addColorStop(1,'#0077B6');
+  ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+  ctx.fillStyle='#4A90C4';ctx.beginPath();ctx.moveTo(w*.1,h*.5);ctx.quadraticCurveTo(w*.5,h*.2,w*.85,h*.45);ctx.quadraticCurveTo(w*.5,h*.65,w*.1,h*.5);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#6AAFD4';ctx.beginPath();ctx.moveTo(w*.15,h*.5);ctx.quadraticCurveTo(w*.5,h*.28,w*.8,h*.46);ctx.quadraticCurveTo(w*.5,h*.55,w*.15,h*.5);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#E8F4F8';ctx.beginPath();ctx.ellipse(w*.5,h*.47,w*.18,h*.06,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#4A90C4';
+  ctx.beginPath();ctx.moveTo(w*.55,h*.32);ctx.lineTo(w*.65,h*.18);ctx.lineTo(w*.7,h*.35);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(w*.85,h*.45);ctx.lineTo(w*.97,h*.5);ctx.lineTo(w*.85,h*.55);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#1a1a1a';ctx.beginPath();ctx.arc(w*.16,h*.47,w*.018,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(w*.165,h*.465,w*.007,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#2A6EA6';ctx.lineWidth=w*.012;ctx.beginPath();ctx.arc(w*.12,h*.52,w*.03,0,Math.PI);ctx.stroke();
+}
+
+const masterCanvas=document.createElement('canvas');
+masterCanvas.width=BS;masterCanvas.height=BS;
+const mctx=masterCanvas.getContext('2d');
+
+function buildPuzzleNav(){
+  const nav=document.getElementById('puzzle-nav');
+  nav.innerHTML='';
+  PUZZLES.forEach((p,i)=>{
+    const btn=document.createElement('button');
+    btn.className='puzzle-nav-btn'+(i===currentPuzzle?' active':'');
+    btn.textContent=p.name;
+    btn.onclick=()=>{currentPuzzle=i;initGame();};
+    nav.appendChild(btn);
+  });
+}
+
+function renderPuzzle(){
+  mctx.clearRect(0,0,BS,BS);
+  PUZZLES[currentPuzzle].draw(mctx,BS,BS);
+  const prev=document.getElementById('preview-canvas');
+  prev.width=BS;prev.height=BS;
+  prev.getContext('2d').drawImage(masterCanvas,0,0);
+}
+
+function initGame(g){
+  if(g) grid=g;
+  document.querySelectorAll('.size-btn').forEach((b,i)=>b.classList.toggle('active',[2,3,4,5][i]===grid));
+  moves=0;seconds=0;solved=false;
+  document.getElementById('moves').textContent='0';
+  document.getElementById('timer').textContent='0:00';
+  document.getElementById('puzzle-name').textContent=PUZZLES[currentPuzzle].name;
+  if(timerInterval) clearInterval(timerInterval);
+  timerInterval=setInterval(()=>{
+    if(!solved){seconds++;const m=Math.floor(seconds/60),s=seconds%60;document.getElementById('timer').textContent=`${m}:${s.toString().padStart(2,'0')}`;}
+  },1000);
+  document.getElementById('complete-banner').classList.remove('show');
+  renderPuzzle();
+  buildPuzzleNav();
+  buildBoard();
+  buildPieces();
+}
+
+function buildPieces(){
+  const pool=document.getElementById('piece-pool');
+  pool.innerHTML='';
+  pieces=[];
+  const cellPx=BS/grid;
+  const order=[...Array(grid*grid).keys()].sort(()=>Math.random()-.5);
+  order.forEach(idx=>{
+    const row=Math.floor(idx/grid),col=idx%grid;
+    // Draw piece at exact square size
+    const pc=document.createElement('canvas');
+    const sz=Math.round(cellPx);
+    pc.width=sz;pc.height=sz;
+    pc.getContext('2d').drawImage(masterCanvas,col*cellPx,row*cellPx,cellPx,cellPx,0,0,sz,sz);
+    // Force canvas to fill its container square
+    pc.style.cssText='display:block;width:100%;height:100%;';
+    const wrap=document.createElement('div');
+    wrap.className='piece';
+    wrap.draggable=true;
+    wrap.dataset.idx=idx;
+    wrap.appendChild(pc);
+    wrap.addEventListener('dragstart',onPieceDrag);
+    pool.appendChild(wrap);
+    pieces.push({idx,el:wrap});
+  });
+}
+
+function buildBoard(){
+  const board=document.getElementById('board');
+  board.innerHTML='';
+  const cellSize=Math.floor(420/grid);
+  board.style.gridTemplateColumns=`repeat(${grid},${cellSize}px)`;
+  board.style.width=`${cellSize*grid}px`;
+  board.style.height=`${cellSize*grid}px`;
+  boardState=Array(grid*grid).fill(null);
+  for(let i=0;i<grid*grid;i++){
+    const cell=document.createElement('div');
+    cell.className='cell';
+    cell.style.width=`${cellSize}px`;
+    cell.style.height=`${cellSize}px`;
+    cell.addEventListener('dragover',e=>{e.preventDefault();cell.classList.add('drag-over');});
+    cell.addEventListener('dragleave',()=>cell.classList.remove('drag-over'));
+    cell.addEventListener('drop',e=>{e.preventDefault();cell.classList.remove('drag-over');onDrop(e,i);});
+    board.appendChild(cell);
+  }
+}
+
+let dragIdx=null, dragFromPos=null;
+
+function onPieceDrag(e){
+  startBgMusic();
+  dragSourceCell=null;
+  dragIdx=parseInt(e.currentTarget.dataset.idx);
+  dragFromPos=null;
+  setTimeout(()=>e.currentTarget.classList.add('dragging'),0);
+}
+
+function onBoardPieceDrag(e,pos){
+  if(solved) return;
+  startBgMusic();
+  dragIdx=boardState[pos];
+  dragFromPos=pos;
+  e.dataTransfer.effectAllowed='move';
+  e.currentTarget.style.opacity='0.35';
+}
+
+function onDrop(e,pos){
+  if(dragIdx===null) return;
+  if(dragFromPos===pos){dragIdx=null;dragFromPos=null;renderBoardCell(pos);return;}
+  playDrop();
+  moves++;document.getElementById('moves').textContent=moves;
+  const board=document.getElementById('board');
+
+  // If dragged FROM a board cell, clear that cell first
+  if(dragFromPos!==null){
+    boardState[dragFromPos]=null;
+    board.children[dragFromPos].innerHTML='';
+    board.children[dragFromPos].classList.remove('correct');
+    board.children[dragFromPos].style.opacity='';
+  }
+
+  // If destination cell already has a piece, send it back to pool
+  if(boardState[pos]!==null){
+    const old=pieces.find(p=>p.idx===boardState[pos])?.el;
+    if(old){old.classList.remove('used');document.getElementById('piece-pool').appendChild(old);}
+  }
+
+  boardState[pos]=dragIdx;
+  renderBoardCell(pos);
+
+  // Mark piece as used so it hides from pool
+  const pieceEl=pieces.find(p=>p.idx===dragIdx)?.el;
+  if(pieceEl) pieceEl.classList.add('used');
+
+  document.querySelectorAll('.piece.dragging').forEach(p=>p.classList.remove('dragging'));
+  dragIdx=null;
+  dragFromPos=null;
+  checkComplete();
+}
+
+function renderBoardCell(pos){
+  const board=document.getElementById('board');
+  const cell=board.children[pos];
+  const idx=boardState[pos];
+  if(idx===null){cell.innerHTML='';cell.classList.remove('correct');return;}
+  const cellSize=Math.floor(420/grid);
+  const cellPx=BS/grid;
+  const cv=document.createElement('canvas');
+  cv.width=cellSize;cv.height=cellSize;
+  const row=Math.floor(idx/grid),col=idx%grid;
+  cv.getContext('2d').drawImage(masterCanvas,col*cellPx,row*cellPx,cellPx,cellPx,0,0,cellSize,cellSize);
+  cv.style.cssText='display:block;width:100%;height:100%;';
+  // Make wrong pieces draggable from board
+  const isCorrect=(idx===pos);
+  if(!isCorrect){
+    cv.style.cursor='grab';
+    cell.style.cursor='grab';
+    cell.setAttribute('draggable','true');
+    cell.ondragstart=(e)=>{e.dataTransfer.effectAllowed='move';onBoardPieceDrag(e,pos);};
+    cell.ondragend=()=>{cell.style.opacity='';};
+  } else {
+    cell.removeAttribute('draggable');
+    cell.ondragstart=null;
+    cell.style.cursor='default';
+  }
+  cell.innerHTML='';cell.appendChild(cv);
+  cell.classList.remove('correct');
+  if(isCorrect){cell.classList.add('correct');playCorrect();}else{playWrong();}
+}
+
+function onDropToPool(e){
+  e.preventDefault();
+  if(dragIdx===null) return;
+  if(dragFromPos!==null){
+    boardState[dragFromPos]=null;
+    const board=document.getElementById('board');
+    board.children[dragFromPos].innerHTML='';
+    board.children[dragFromPos].classList.remove('correct');
+    board.children[dragFromPos].style.opacity='';
+    board.children[dragFromPos].removeAttribute('draggable');
+    board.children[dragFromPos].ondragstart=null;
+  }
+  const pieceEl=pieces.find(p=>p.idx===dragIdx)?.el;
+  if(pieceEl){pieceEl.classList.remove('used');}
+  dragIdx=null;dragFromPos=null;
+  document.querySelectorAll('.piece.dragging').forEach(p=>p.classList.remove('dragging'));
+}
+
+function checkComplete(){
+  if(boardState.every((v,i)=>v===i)&&boardState.every(v=>v!==null)){
+    solved=true;clearInterval(timerInterval);playWin();
+    document.getElementById('complete-banner').classList.add('show');
+    document.getElementById('complete-title').textContent='Puzzle Complete! 🎉';
+    document.getElementById('complete-msg').textContent=`You solved the ${PUZZLES[currentPuzzle].name} in ${moves} moves and ${document.getElementById('timer').textContent}!`;
+  }
+}
+
+function showHint(){
+  const board=document.getElementById('board');
+  boardState.forEach((v,i)=>{if(v===i&&v!==null) board.children[i].classList.add('correct');});
+  const first=boardState.findIndex((v,i)=>v!==null&&v!==i);
+  if(first>=0){board.children[first].style.outline='3px solid #E24B4A';setTimeout(()=>board.children[first].style.outline='',1500);}
+  moves+=3;document.getElementById('moves').textContent=moves;
+}
+
+function nextPuzzle(){
+  currentPuzzle=(currentPuzzle+1)%PUZZLES.length;
+  initGame();
+}
+
+
+// ── AUDIO ENGINE ──────────────────────────────────────────────
+let audioCtx=null, bgGain=null, bgMuted=false, bgRunning=false;
+
+// Cheerful ocean-themed melody (note freq, duration in seconds)
+const MELODY=[
+  [523,.25],[659,.25],[784,.25],[1047,.5],
+  [784,.25],[659,.25],[523,.5],
+  [587,.25],[698,.25],[880,.25],[1175,.5],
+  [880,.25],[698,.25],[587,.5],
+  [659,.25],[784,.25],[1047,.25],[784,.25],
+  [659,.25],[523,.25],[440,.25],[523,.5],
+  [392,.25],[523,.25],[659,.25],[784,.5],
+  [698,.25],[587,.25],[523,.75],
+];
+
+function getCtx(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function startBgMusic(){
+  if(bgRunning) return;
+  try{
+    const ctx=getCtx();
+    bgGain=ctx.createGain();
+    bgGain.gain.value=bgMuted?0:0.06;
+    bgGain.connect(ctx.destination);
+    bgRunning=true;
+    loopMelody();
+  }catch(e){}
+}
+
+function loopMelody(){
+  if(!audioCtx||!bgGain) return;
+  const ctx=audioCtx;
+  let t=ctx.currentTime;
+  const totalDur=MELODY.reduce((s,[,d])=>s+d,0);
+  MELODY.forEach(([freq,dur])=>{
+    // Main tone
+    const osc=ctx.createOscillator();
+    const g=ctx.createGain();
+    osc.type='sine'; osc.frequency.value=freq;
+    osc.connect(g); g.connect(bgGain);
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(0.8,t+0.02);
+    g.gain.setValueAtTime(0.8,t+dur-0.05);
+    g.gain.linearRampToValueAtTime(0,t+dur);
+    osc.start(t); osc.stop(t+dur+0.01);
+    // Soft harmony (5th below)
+    const osc2=ctx.createOscillator();
+    const g2=ctx.createGain();
+    osc2.type='sine'; osc2.frequency.value=freq*0.667;
+    osc2.connect(g2); g2.connect(bgGain);
+    g2.gain.setValueAtTime(0,t);
+    g2.gain.linearRampToValueAtTime(0.3,t+0.03);
+    g2.gain.setValueAtTime(0.3,t+dur-0.05);
+    g2.gain.linearRampToValueAtTime(0,t+dur);
+    osc2.start(t); osc2.stop(t+dur+0.01);
+    t+=dur;
+  });
+  setTimeout(loopMelody,(totalDur-0.1)*1000);
+}
+
+function toggleMute(){
+  bgMuted=!bgMuted;
+  document.getElementById('mute-btn').textContent=bgMuted?'🔇 Muted':'🔊 Music';
+  if(bgGain) bgGain.gain.setTargetAtTime(bgMuted?0:0.06,audioCtx.currentTime,0.15);
+}
+
+function playCorrect(){
+  try{
+    const ctx=getCtx();
+    [523,659,784,1047].forEach((f,i)=>{
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.type='sine';o.frequency.value=f;
+      o.connect(g);g.connect(ctx.destination);
+      const t=ctx.currentTime+i*0.08;
+      g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(0.18,t+0.01);
+      g.gain.exponentialRampToValueAtTime(0.001,t+0.25);
+      o.start(t);o.stop(t+0.26);
+    });
+  }catch(e){}
+}
+
+function playWrong(){
+  try{
+    const ctx=getCtx();
+    [300,260].forEach((f,i)=>{
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.type='sawtooth';o.frequency.value=f;
+      o.connect(g);g.connect(ctx.destination);
+      const t=ctx.currentTime+i*0.12;
+      g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(0.1,t+0.01);
+      g.gain.exponentialRampToValueAtTime(0.001,t+0.2);
+      o.start(t);o.stop(t+0.21);
+    });
+  }catch(e){}
+}
+
+function playDrop(){
+  try{
+    const ctx=getCtx();
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='sine';o.frequency.setValueAtTime(440,ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(660,ctx.currentTime+0.08);
+    o.connect(g);g.connect(ctx.destination);
+    g.gain.setValueAtTime(0,ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.12,ctx.currentTime+0.01);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.15);
+    o.start(ctx.currentTime);o.stop(ctx.currentTime+0.16);
+  }catch(e){}
+}
+
+function playWin(){
+  try{
+    const ctx=getCtx();
+    const fanfare=[523,659,784,1047,784,1047,1319];
+    let t=ctx.currentTime;
+    fanfare.forEach((f,i)=>{
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.type='sine';o.frequency.value=f;
+      o.connect(g);g.connect(ctx.destination);
+      g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(0.2,t+0.02);
+      g.gain.setValueAtTime(0.2,t+0.12);
+      g.gain.exponentialRampToValueAtTime(0.001,t+(i===fanfare.length-1?0.6:0.15));
+      o.start(t);o.stop(t+(i===fanfare.length-1?0.61:0.16));
+      t+=i===fanfare.length-2?0.2:0.1;
+    });
+  }catch(e){}
+}
+// ── END AUDIO ENGINE ──────────────────────────────────────────
+
+initGame(3);
+</script>
+</body>
+</html>
