@@ -3,7 +3,7 @@ An interactive drag-and-drop ocean puzzle game designed for kids aged 9–12, bu
 Kids drag and drop puzzle pieces to complete beautiful ocean creature illustrations. This games also complete with background music, sound effects, and difficulty levels they can choose themselves!
 
 🌐 Live Demo
-👉 Play Now
+👉 [Play Now](https://aininsofiya1610.github.io/puzzle/)
 
 🎯 How to Play
 
